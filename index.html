@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+
+<html lang="ja">
+
+<head>
+
+  <meta charset="UTF-8">
+
+  <meta name="viewport"
+
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+  <title>スワイプ体験デモ</title>
+
+  <style>
+
+    * {
+
+      box-sizing: border-box;
+
+      -webkit-tap-highlight-color: transparent;
+
+    }
+
+    html,
+
+    body {
+
+      margin: 0;
+
+      width: 100%;
+
+      height: 100%;
+
+      overflow: hidden;
+
+      background: #000;
+
+      touch-action: none;
+
+    }
+
+    #app {
+
+      position: relative;
+
+      width: 100%;
+
+      height: 100dvh;
+
+      display: flex;
+
+      justify-content: center;
+
+      align-items: center;
+
+      background: #000;
+
+      overflow: hidden;
+
+    }
+
+    /* スクショ */
+
+    #screen {
+
+      width: 100%;
+
+      height: 100%;
+
+      object-fit: contain;
+
+      display: block;
+
+      user-select: none;
+
+      -webkit-user-drag: none;
+
+    }
+
+    /* くるくる画面 */
+
+    #loading {
+
+      position: absolute;
+
+      inset: 0;
+
+      background: rgba(0, 0, 0, 0.78);
+
+      display: flex;
+
+      justify-content: center;
+
+      align-items: center;
+
+      opacity: 0;
+
+      pointer-events: none;
+
+      transition: opacity 0.15s ease;
+
+    }
+
+    #loading.show {
+
+      opacity: 1;
+
+    }
+
+    /* くるくる */
+
+    .spinner {
+
+      width: 48px;
+
+      height: 48px;
+
+      border: 5px solid rgba(255, 255, 255, 0.3);
+
+      border-top-color: white;
+
+      border-radius: 50%;
+
+      animation: spin 0.8s linear infinite;
+
+    }
+
+    @keyframes spin {
+
+      to {
+
+        transform: rotate(360deg);
+
+      }
+
+    }
+
+    /* 最初の説明 */
+
+    #hint {
+
+      position: absolute;
+
+      left: 50%;
+
+      bottom: 24px;
+
+      transform: translateX(-50%);
+
+      color: white;
+
+      background: rgba(0, 0, 0, 0.65);
+
+      padding: 9px 14px;
+
+      border-radius: 999px;
+
+      font-size: 13px;
+
+      white-space: nowrap;
+
+      opacity: 0.9;
+
+      transition: opacity 0.5s;
+
+      pointer-events: none;
+
+    }
+
+    #hint.hide {
+
+      opacity: 0;
+
+    }
+
+    /* 読み込み後の表示 */
+
+    #message {
+
+      position: absolute;
+
+      top: 50%;
+
+      left: 50%;
+
+      transform: translate(-50%, -50%);
+
+      color: white;
+
+      background: rgba(0, 0, 0, 0.65);
+
+      padding: 10px 18px;
+
+      border-radius: 12px;
+
+      font-size: 15px;
+
+      opacity: 0;
+
+      pointer-events: none;
+
+      transition: opacity 0.2s;
+
+    }
+
+    #message.show {
+
+      opacity: 1;
+
+    }
+
+  </style>
+
+</head>
+
+<body>
+
+  <main id="app">
+
+    <!-- ここにスクショを表示 -->
+
+    <img
+
+      id="screen"
+
+      src="screen.jpg"
+
+      alt="画面"
+
+    >
+
+    <!-- くるくる -->
+
+    <div id="loading">
+
+      <div class="spinner"></div>
+
+    </div>
+
+    <!-- 読み込み完了表示 -->
+
+    <div id="message">
+
+      読み込み完了
+
+    </div>
+
+    <!-- 最初だけ表示 -->
+
+    <div id="hint">
+
+      上にスワイプしてみて
+
+    </div>
+
+  </main>
+
+  <script>
+
+    const app = document.getElementById("app");
+
+    const loading = document.getElementById("loading");
+
+    const message = document.getElementById("message");
+
+    const hint = document.getElementById("hint");
+
+    /* スワイプ開始位置 */
+
+    let startY = 0;
+
+    let startX = 0;
+
+    let isSwiping = false;
+
+    let busy = false;
+
+    /* これ以上動いたらスワイプと判定 */
+
+    const SWIPE_DISTANCE = 70;
+
+    /*
+
+      =========================
+
+      スマホのスワイプ
+
+      =========================
+
+    */
+
+    app.addEventListener("touchstart", (event) => {
+
+      if (busy) return;
+
+      const touch = event.changedTouches[0];
+
+      startY = touch.clientY;
+
+      startX = touch.clientX;
+
+      isSwiping = true;
+
+    }, { passive: true });
+
+    app.addEventListener("touchend", (event) => {
+
+      if (!isSwiping || busy) return;
+
+      const touch = event.changedTouches[0];
+
+      const diffY = touch.clientY - startY;
+
+      const diffX = touch.clientX - startX;
+
+      isSwiping = false;
+
+      /*
+
+        上方向にスワイプした場合
+
+      */
+
+      if (
+
+        diffY < -SWIPE_DISTANCE &&
+
+        Math.abs(diffY) > Math.abs(diffX)
+
+      ) {
+
+        reloadSameScreen();
+
+      }
+
+    }, { passive: true });
+
+    /*
+
+      =========================
+
+      パソコンのマウス操作
+
+      =========================
+
+    */
+
+    let mouseStartY = 0;
+
+    let mouseDown = false;
+
+    app.addEventListener("mousedown", (event) => {
+
+      if (busy) return;
+
+      mouseDown = true;
+
+      mouseStartY = event.clientY;
+
+    });
+
+    app.addEventListener("mouseup", (event) => {
+
+      if (!mouseDown || busy) return;
+
+      mouseDown = false;
+
+      const diffY = event.clientY - mouseStartY;
+
+      if (diffY < -SWIPE_DISTANCE) {
+
+        reloadSameScreen();
+
+      }
+
+    });
+
+    /*
+
+      =========================
+
+      スワイプ後の処理
+
+      =========================
+
+    */
+
+    function reloadSameScreen() {
+
+      busy = true;
+
+      /*
+
+        「上にスワイプしてみて」
+
+        を消す
+
+      */
+
+      hint.classList.add("hide");
+
+      /*
+
+        くるくる開始
+
+      */
+
+      loading.classList.add("show");
+
+      /*
+
+        1秒待つ
+
+      */
+
+      setTimeout(() => {
+
+        /*
+
+          くるくる終了
+
+        */
+
+        loading.classList.remove("show");
+
+        /*
+
+          同じ画面を表示
+
+        */
+
+        message.classList.add("show");
+
+        /*
+
+          「読み込み完了」を
+
+          少しだけ表示
+
+        */
+
+        setTimeout(() => {
+
+          message.classList.remove("show");
+
+        }, 450);
+
+        /*
+
+          またスワイプできるようにする
+
+        */
+
+        busy = false;
+
+      }, 1000);
+
+    }
+
+  </script>
+
+</body>
+
+</html>
