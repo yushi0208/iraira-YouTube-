@@ -1,281 +1,289 @@
 <!DOCTYPE html>
-
 <html lang="ja">
-
 <head>
+<meta charset="UTF-8">
+<meta name="viewport"
+      content="width=device-width,
+               initial-scale=1.0,
+               maximum-scale=1.0,
+               user-scalable=no">
 
-  <meta charset="UTF-8">
+<title>Home</title>
 
-  <meta name="viewport"
+<style>
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
 
-        content="width=device-width, initial-scale=1.0">
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
 
-  <title>スワイプ体験</title>
+  /* 本物のスクロールを完全に止める */
+  overflow: hidden;
+  overscroll-behavior: none;
 
-  <style>
+  background: #000;
+}
 
-    * {
+/* サイト全体 */
+#app {
+  position: fixed;
+  inset: 0;
 
-      box-sizing: border-box;
+  width: 100%;
+  height: 100%;
 
-    }
+  overflow: hidden;
 
-    html,
+  touch-action: none;
 
-    body {
+  background: #000;
+}
 
-      margin: 0;
+/*
+  YouTubeホーム画面の画像
 
-      padding: 0;
+  youtube-home.png を
+  index.html と同じ場所に置く
+*/
+#home-image {
+  position: absolute;
 
-      width: 100%;
+  top: 0;
+  left: 0;
 
-      background: #fff;
+  width: 100%;
+  height: 100%;
 
-      /* 下にスクロールできる */
+  object-fit: cover;
 
-      overflow-x: hidden;
+  user-select: none;
+  -webkit-user-drag: none;
 
-      overflow-y: auto;
+  pointer-events: none;
+}
 
-      font-family: Arial, sans-serif;
+/*
+  上側のグルグル表示エリア
 
-    }
+  普段は透明。
+*/
+#refresh-area {
+  position: absolute;
 
-    /* ページ全体 */
+  top: 0;
+  left: 0;
 
-    #app {
+  width: 100%;
+  height: 100px;
 
-      position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 
-      width: 100%;
+  pointer-events: none;
+}
 
-      background: #fff;
+/* グルグル */
+#spinner {
+  width: 30px;
+  height: 30px;
 
-    }
+  border: 3px solid rgba(255,255,255,0.35);
+  border-top-color: white;
 
-    /* スクショ */
+  border-radius: 50%;
 
-    #screen {
+  opacity: 0;
 
-      display: block;
+  transform: scale(0.7);
 
-      width: 100%;
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
+}
 
-      height: auto;
+/* 表示中 */
+#spinner.show {
+  opacity: 1;
+  transform: scale(1);
 
-      user-select: none;
+  animation: spin 0.75s linear infinite;
+}
 
-      -webkit-user-drag: none;
+@keyframes spin {
 
-    }
+  from {
+    transform: rotate(0deg);
+  }
 
-    /* くるくる */
+  to {
+    transform: rotate(360deg);
+  }
 
-    #loading {
-
-      position: fixed;
-
-      top: 50%;
-
-      left: 50%;
-
-      transform: translate(-50%, -50%);
-
-      width: 50px;
-
-      height: 50px;
-
-      display: flex;
-
-      justify-content: center;
-
-      align-items: center;
-
-      opacity: 0;
-
-      pointer-events: none;
-
-      z-index: 1000;
-
-    }
-
-    #loading.show {
-
-      opacity: 1;
-
-    }
-
-    /* くるくる本体 */
-
-    .spinner {
-
-      width: 45px;
-
-      height: 45px;
-
-      border: 5px solid #ddd;
-
-      border-top-color: #777;
-
-      border-radius: 50%;
-
-      animation: spin 0.8s linear infinite;
-
-    }
-
-    @keyframes spin {
-
-      from {
-
-        transform: rotate(0deg);
-
-      }
-
-      to {
-
-        transform: rotate(360deg);
-
-      }
-
-    }
-
-  </style>
-
+}
+</style>
 </head>
 
 <body>
 
-  <main id="app">
+<div id="app">
 
-    <!-- スクショ -->
+  <!-- YouTubeホーム画面のスクショ -->
+  <img
+    id="home-image"
+    src="youtube-home.png"
+    alt=""
+    draggable="false"
+  >
 
-    <img
+  <!-- 上のグルグル -->
+  <div id="refresh-area">
+    <div id="spinner"></div>
+  </div>
 
-      id="screen"
+</div>
 
-      src="screen.jpg"
 
-      alt=""
+<script>
 
-    >
+/* =========================
+   スワイプ処理
+========================= */
 
-    <!-- くるくる -->
+const app = document.getElementById("app");
+const spinner = document.getElementById("spinner");
 
-    <div id="loading">
+let startY = 0;
+let currentY = 0;
 
-      <div class="spinner"></div>
+let swiping = false;
+let loading = false;
 
-    </div>
 
-  </main>
+/* 指を画面につけた */
+app.addEventListener("touchstart", function(e) {
 
-  <script>
+  if (e.touches.length !== 1) return;
 
-    const loading =
+  startY = e.touches[0].clientY;
+  currentY = startY;
 
-      document.getElementById("loading");
+  swiping = true;
 
-    let startY = 0;
+}, { passive: false });
 
-    let busy = false;
+
+/* 指を動かしている */
+app.addEventListener("touchmove", function(e) {
+
+  if (!swiping) return;
+
+  currentY = e.touches[0].clientY;
+
+  /*
+    ここが重要。
+
+    実際のページを
+    下方向へスクロールさせない。
+  */
+  e.preventDefault();
+
+}, { passive: false });
+
+
+/* 指を離した */
+app.addEventListener("touchend", function(e) {
+
+  if (!swiping) return;
+
+  swiping = false;
+
+  const distance = currentY - startY;
+
+
+  /*
+    上 → 下へ
+    60px以上スワイプしたら
+    更新っぽい動作
+  */
+  if (distance >= 60 && !loading) {
+
+    refreshAnimation();
+
+  }
+
+}, { passive: false });
+
+
+/* =========================
+   更新アニメーション
+========================= */
+
+function refreshAnimation() {
+
+  loading = true;
+
+  /* グルグルを表示 */
+  spinner.classList.add("show");
+
+
+  /*
+    少し待つ
+  */
+  setTimeout(function() {
+
+    /* グルグルを消す */
+    spinner.classList.remove("show");
+
 
     /*
+      ★重要★
 
-      スワイプ開始
+      画像を変更しない。
 
+      新しい動画も読み込まない。
+
+      つまり何回やっても
+      同じホーム画面のまま。
     */
 
-    document.addEventListener(
+    loading = false;
 
-      "touchstart",
+  }, 900);
 
-      function(event) {
+}
 
-        startY =
 
-          event.touches[0].clientY;
+/* =========================
+   iPhoneのスクロール防止
+========================= */
 
-      },
+document.addEventListener("touchmove", function(e) {
 
-      { passive: true }
+  e.preventDefault();
 
-    );
+}, { passive: false });
 
-    /*
 
-      スワイプ終了
+/*
+  ブラウザの
+  pull-to-refresh対策
+*/
+document.body.addEventListener("touchstart", function(e) {
 
-    */
+  if (e.touches[0].clientY <= 5) {
+    e.preventDefault();
+  }
 
-    document.addEventListener(
+}, { passive: false });
 
-      "touchend",
-
-      function(event) {
-
-        if (busy) return;
-
-        const endY =
-
-          event.changedTouches[0].clientY;
-
-        const distance =
-
-          startY - endY;
-
-        /*
-
-          上に70px以上
-
-          スワイプしたら
-
-          くるくる
-
-        */
-
-        if (distance > 70) {
-
-          showLoading();
-
-        }
-
-      },
-
-      { passive: true }
-
-    );
-
-    /*
-
-      くるくる表示
-
-    */
-
-    function showLoading() {
-
-      busy = true;
-
-      loading.classList.add("show");
-
-      /*
-
-        1秒後に消す
-
-      */
-
-      setTimeout(function() {
-
-        loading.classList.remove("show");
-
-        busy = false;
-
-      }, 1000);
-
-    }
-
-  </script>
+</script>
 
 </body>
-
 </html>
